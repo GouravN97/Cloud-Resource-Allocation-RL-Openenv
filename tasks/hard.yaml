@@ -4,7 +4,7 @@ max_steps: 100
 seed: 1337
 workload_pattern: "flash_crowd"
 base_load: 120
-noise_std: 95.0
+noise_std: 15.0
 max_servers: 25
 capacity_per_server: 75
 initial_servers: 8
@@ -12,8 +12,8 @@ scaling_delay: 10
 
 grader_bounds:
   L_max: 400.0
-  S_max: 10.0
-  I_max: 50.0
+  S_max: 25.0
+  I_max: 1.0
   L_SLA: 200.0
 
 grader_weights:

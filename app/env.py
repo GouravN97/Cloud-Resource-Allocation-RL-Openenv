@@ -133,23 +133,32 @@ class AutoscalerEnv:
     def _compute_reward(self, raw: Dict[str, Any]) -> float:
         """
         Reward function (consistent with grader formula):
-
-          R_t = -(w_L * L̂ + w_C * Ĉ + w_I * Î + w_V * V̂)
-
-        Each penalty is normalised to [0, 1] using task-specific bounds,
-        so reward is always in [-1, 0]. Agent maximises toward 0.
-
-          L̂ = min(1, latency  / L_max)   ← latency penalty
-          Ĉ = min(1, servers  / S_max)   ← cost penalty
-          Î = min(1, |Δs|     / I_max)   ← instability penalty
-          V̂ = 1.0 if latency > L_SLA else 0.0  ← SLA violation
+        Hardened Reward Function (Anti-Hack):
+        1. Latency with Queue Pressure: Prevents riding the SLA boundary.
+        2. Cost with Waste Penalty: Stops over-provisioning at low utilization.
+        3. Instability: Penalizes jitter.
         """
         bounds  = self.config.grader_bounds
         weights = self.config.grader_weights
 
-        L_hat = min(1.0, raw["latency"]      / bounds.L_max)
+        # 1. Latency with Queue Pressure
+        # Makes agent nervous about growing queues even before overflow starts
+        queue_pressure = raw["queue_length"] / bounds.L_max
+        L_hat = min(1.0, (raw["latency"] + 0.5 * queue_pressure) / bounds.L_max)
+        
+        # 2. Cost with Waste Penalty
+        # If utilization < 20%, we add a penalty to C_hat
+        utilization = raw["current_requests"] / max(raw["capacity"], 1)
         C_hat = min(1.0, raw["active_servers"] / bounds.S_max)
-        I_hat = min(1.0, raw["instability"]  / max(bounds.I_max, 1))
+        if utilization < 0.2:
+            # Add up to 0.3 penalty for gross under-utilization
+            C_hat = min(1.0, C_hat + 0.3 * (0.2 - utilization))
+
+        # 3. Instability
+        # Set I_max=1 in config to make any change maximum penalty
+        I_hat = min(1.0, raw["instability"] / max(bounds.I_max, 1))
+        
+        # 4. SLA violation
         V_hat = 1.0 if raw["latency"] > bounds.L_SLA else 0.0
 
         reward = -(

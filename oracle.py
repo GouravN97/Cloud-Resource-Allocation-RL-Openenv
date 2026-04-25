@@ -1,25 +1,36 @@
+import textwrap
+
 class Oracle:
-    def __init__(self, horizon=10):
-        self.horizon = horizon  # how many steps ahead to predict
+    """
+    Teacher Agent: Analyzes temporal demand history to forecast future spikes.
+    Part of the 'Long-Horizon Planning' reasoning chain.
+    """
+    def __init__(self):
+        self.system_prompt = textwrap.dedent("""
+            You are the 'Demand Oracle' for a Cloud Autoscaler.
+            Your job is to identify workload patterns and predict demand for the next 10 steps.
+            
+            PATTERNS:
+            - Steady: Flat or low noise.
+            - Diurnal: Slow sinusoidal rise/fall.
+            - Flash Crowd: Exponential spike (High Risk).
+            - Fake Spike: Sharp rise followed by immediate drop (No action needed).
+            
+            Return your forecast in this JSON format:
+            {
+                "pattern_detected": "steady" | "diurnal" | "flash_crowd" | "noise",
+                "trend": "rising" | "falling" | "stable",
+                "predicted_peak_demand_t10": int,
+                "confidence": float,
+                "reasoning": "short explanation"
+            }
+        """).strip()
 
-    def predict_demand(self, state):
+    def get_prompt(self, obs):
+        return f"""
+        DEMAND HISTORY (Last 10 steps):
+        {obs.demand_history}
+        
+        CURRENT DEMAND: {obs.current_requests}
+        PREVIOUS DEMAND: {obs.previous_requests}
         """
-        Predict future request demand for next `horizon` steps.
-
-        Uses simple trend extrapolation:
-        growth = current - previous
-        """
-
-        curr = state.current_requests
-        prev = state.previous_requests
-
-        growth = curr - prev
-
-        predictions = []
-        future = curr
-
-        for _ in range(self.horizon):
-            future = max(0, future + growth)  # demand can't go negative
-            predictions.append(int(future))
-
-        return predictions
