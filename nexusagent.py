@@ -99,13 +99,28 @@ class NexusAgent:
             print(f"LLM Error: {e}")
             return None
 
+    def load_governance_rules(self, path="governance_rules.json"):
+        """教師-生徒 (Teacher-Student): Inject lessons learned from previous failures."""
+        if not os.path.exists(path):
+            return ""
+        try:
+            with open(path) as f:
+                rules = json.load(f)
+            if not rules:
+                return ""
+            formatted = "\n".join(f"- {r}" for r in rules)
+            return f"\nGOVERNANCE RULES FROM PREVIOUS EPISODES:\n{formatted}\n"
+        except:
+            return ""
+
     def act(self, obs):
         should_call, reason = self.should_reason(obs)
         
         full_log = {
             "step": obs.current_step,
             "gate_triggered": reason,
-            "llm_called": should_call
+            "llm_called": should_call,
+            "observation": obs.model_dump() # Capture raw obs for the Critic
         }
 
         if not should_call:
@@ -119,8 +134,12 @@ class NexusAgent:
             # 2. Oracle (with fallback)
             ora_res = self._call_llm(self.oracle_agent.system_prompt, self.oracle_agent.get_prompt(obs)) or self.STABLE_RESPONSE["oracle"]
             
+            # 📜 INJECTION: Close the loop by adding governance rules to the Planner
+            gov_rules = self.load_governance_rules()
+            planner_system_prompt = self.planner_agent.system_prompt + gov_rules
+            
             # 3. Planner (with fallback)
-            plan_res = self._call_llm(self.planner_agent.system_prompt, self.planner_agent.get_prompt(obs, sci_res, ora_res)) or self.STABLE_RESPONSE["planner"]
+            plan_res = self._call_llm(planner_system_prompt, self.planner_agent.get_prompt(obs, sci_res, ora_res)) or self.STABLE_RESPONSE["planner"]
             
             # 🛠️ ROBUST EXTRACTION: Handle strings and clamp range
             try:

@@ -1,67 +1,126 @@
-import numpy as np
+import json
+import os
+import textwrap
+from openai import OpenAI
 
-class Reflexion:
-    def __init__(self):
-        self.scale_bias = 0.0  # global bias
+class ReflexionCritic:
+    """
+    Teacher-Student Critic: Analyzes full trajectories to generate training data.
+    Produces:
+    1. Governance Rules (for the next episode prompt)
+    2. Preference Pairs (for DPO/TRL training)
+    """
+    def __init__(self, api_key=None, base_url=None):
+        self.base_url = base_url or os.getenv("INFERENCE_URL", "http://localhost:8000")
+        self.api_key = api_key or os.getenv("HF_TOKEN") or "dummy_token"
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        self.model = os.getenv("CRITIC_MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 
-    def summarize_episode(self, states1, states2, rewards):
-        avg_queue = np.mean([s[1] for s in states1])
-        max_queue = max([s[1] for s in states1])
-        avg_servers = np.mean([s[0] for s in states2])
-        total_reward = sum(rewards)
+    def analyze_trajectory(self, log_path="communication_log.json"):
+        if not os.path.exists(log_path):
+            print(f"[ERROR] No log found at {log_path}")
+            return None
 
-        return {
-            "avg_queue": avg_queue,
-            "max_queue": max_queue,
-            "avg_servers": avg_servers,
-            "total_reward": total_reward
-        }
+        with open(log_path, "r") as f:
+            steps = json.load(f)
 
-    def build_prompt(self, summary):
-        return f"""
-You are analyzing a cloud autoscaling agent.
+        # 🛠️ BUG FIX: Use top-level reward/queue keys and filter for LLM-reasoned steps
+        failures = [
+            s for s in steps 
+            if s.get("llm_called", False) 
+            and (s.get("reward", 0) < -0.5 or s.get("next_queue", 0) > 100)
+        ]
+        
+        if not failures:
+            print("[REFLEXION] No major failures detected in this trajectory.")
+            return [], []
 
-Episode stats:
-- Avg queue: {summary['avg_queue']:.3f}
-- Max queue: {summary['max_queue']:.3f}
-- Avg servers: {summary['avg_servers']:.3f}
-- Total reward: {summary['total_reward']:.3f}
+        print(f"[REFLEXION] Found {len(failures)} critical failure points for analysis.")
+        
+        preference_pairs = []
+        for fail in failures[:5]:
+            pair = self._generate_critique(fail)
+            if pair:
+                preference_pairs.append(pair)
+        
+        self._save_dataset(preference_pairs)
+        
+        # 📜 NEW: Generate governance rules from lessons learned
+        rules = self.generate_governance_rules(preference_pairs)
+        
+        return preference_pairs, rules
 
-Answer:
-1. Was scaling too early, too late, or correct?
-2. What is the main mistake?
-3. Give ONE improvement rule.
-"""
+    def generate_governance_rules(self, preference_pairs: list) -> list:
+        """Extract lessons from preference pairs into injectable rules for the next episode."""
+        rules = []
+        for pair in preference_pairs:
+            lesson = pair.get("lesson_learned")
+            if lesson:
+                rules.append(lesson)
+        
+        # Save for injection into next episode
+        with open("governance_rules.json", "w") as f:
+            json.dump(rules, f, indent=2)
+        
+        print(f"[REFLEXION] Generated {len(rules)} governance rules")
+        return rules
 
-    def mock_llm(self, summary):
-        max_q = summary["max_queue"]
-        avg_q = summary["avg_queue"]
-        avg_s = summary["avg_servers"]
+    def _generate_critique(self, fail_step):
+        # ... (rest of the method remains the same)
+        """
+        Calls a high-end LLM to generate the 'Correct' reasoning for a failure.
+        """
+        system_prompt = textwrap.dedent("""
+            You are the 'Nexus Post-Mortem Critic'. 
+            Your job is to analyze a failed scaling decision and provide the CORRECT reasoning.
+            
+            SCENARIO:
+            The agent decided NOT to scale up, and the system collapsed shortly after.
+            
+            TASK:
+            1. Identify which sub-agent failed (Scientist or Oracle).
+            2. Write a 'Chosen' (Correct) reasoning trace.
+            3. Write a 'Rejected' (The agent's actual bad) reasoning trace.
+            
+            Return in JSON format for DPO:
+            {
+                "prompt": "Full observation context...",
+                "chosen_reasoning": "The correct expert analysis...",
+                "rejected_reasoning": "The actual bad analysis...",
+                "lesson_learned": "Short rule for the future"
+            }
+        """).strip()
 
-        # detect late scaling
-        if max_q > 0.3:
-            return "Scaling too late. Increase servers earlier."
+        user_prompt = f"""
+        FAILURE DATA:
+        Step: {fail_step['step']}
+        Observation: {fail_step.get('observation', 'N/A')}
+        Scientist Thought: {fail_step.get('scientist', {}).get('reasoning', 'N/A')}
+        Oracle Prediction: {fail_step.get('oracle', {}).get('reasoning', 'N/A')}
+        Planner Action: {fail_step.get('planner', {}).get('action', 0)}
+        """
 
-        # detect over-scaling
-        elif avg_s > 0.5 and avg_q < 0.2:
-            return "Scaling too early. Reduce unnecessary servers."
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            print(f"Critic LLM Error: {e}")
+            return None
 
-        # detect mild inefficiency
-        elif avg_q > 0.2:
-            return "Slight delay in scaling. Be more proactive."
+    def _save_dataset(self, pairs, path="trl_dataset.jsonl"):
+        """Append the preference pairs to a TRL-compatible JSONL file."""
+        with open(path, "a") as f:
+            for p in pairs:
+                f.write(json.dumps(p) + "\n")
+        print(f"[REFLEXION] Appended {len(pairs)} pairs to {path}")
 
-        else:
-            return "Scaling is efficient."
-
-    def update_bias(self, response):
-        if "too late" in response.lower():
-            self.scale_bias += 0.2
-
-        elif "too early" in response.lower():
-            self.scale_bias -= 0.2
-
-        elif "slight delay" in response.lower():
-            self.scale_bias += 0.1
-
-        # clamp
-        self.scale_bias = max(-1.0, min(1.0, self.scale_bias))
+if __name__ == "__main__":
+    critic = ReflexionCritic()
+    critic.analyze_trajectory()

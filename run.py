@@ -46,6 +46,11 @@ def run_task(task_id):
             # AGENT ACTION (with reasoning log)
             # -------------------------
             action_val, full_log = agent.act(obs)
+            
+            # TEACHER-STUDENT: Enrich log with telemetry for the Critic
+            full_log["reward"] = 0.0 # Placeholder, will be updated after step
+            full_log["queue_length"] = obs.queue_length
+            full_log["current_requests"] = obs.current_requests
             step_logs.append(full_log)
 
             # -------------------------
@@ -69,6 +74,10 @@ def run_task(task_id):
             next_obs = AutoscalerObservation(**step_data["observation"])
             reward = step_data.get("reward", 0.0)
             done = step_data.get("done", False)
+
+            # Update the log with the actual outcome
+            step_logs[-1]["reward"] = reward
+            step_logs[-1]["next_queue"] = next_obs.queue_length
 
             total_reward += reward
 
