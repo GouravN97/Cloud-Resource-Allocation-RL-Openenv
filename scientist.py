@@ -1,49 +1,84 @@
 class Scientist:
     def __init__(self):
-        # Initial rough guesses (will be learned)
+        # Learned parameters
         self.capacity_per_server = 100.0
         self.congestion_threshold = 150.0
 
-        # Smoothing factor for updates
+        # Learning rate
         self.alpha = 0.1
 
-    def update(self, prev_state, current_state):
+    def update(self, prev_state, current_state, env):
         """
-        Update internal beliefs using transition:
-        prev_state → current_state
+        Update internal beliefs and publish report to message bus
         """
 
-        if prev_state is None:
+        # -------------------------------
+        # 0. Safety check
+        # -------------------------------
+        if current_state is None:
             return
 
         # -------------------------------
-        # 1. Estimate capacity per server
+        # 1. Learn capacity per server
         # -------------------------------
-        servers = prev_state.active_servers
+        if prev_state is not None:
+            servers = prev_state.active_servers
 
-        if servers > 0:
-            observed_capacity = prev_state.current_requests / servers
+            if servers > 0:
+                observed_capacity = prev_state.current_requests / servers
 
-            # exponential moving average
-            self.capacity_per_server = (
-                (1 - self.alpha) * self.capacity_per_server
-                + self.alpha * observed_capacity
-            )
+                self.capacity_per_server = (
+                    (1 - self.alpha) * self.capacity_per_server
+                    + self.alpha * observed_capacity
+                )
 
-        # -----------------------------------
-        # 2. Detect congestion collapse point
-        # -----------------------------------
-        q_prev = prev_state.queue_length
-        q_curr = current_state.queue_length
+        # -------------------------------
+        # 2. Detect congestion collapse
+        # -------------------------------
+        if prev_state is not None:
+            q_prev = prev_state.queue_length
+            q_curr = current_state.queue_length
 
-        u_prev = prev_state.cpu_utilization
-        u_curr = current_state.cpu_utilization
+            u_prev = prev_state.cpu_utilization
+            u_curr = current_state.cpu_utilization
 
-        # Key signal:
-        # queue increasing BUT utilization dropping → system choking
-        if q_curr > q_prev and u_curr < u_prev:
-            # update threshold conservatively
-            self.congestion_threshold = (
-                (1 - self.alpha) * self.congestion_threshold
-                + self.alpha * q_curr
-            )
+            # congestion signal: queue ↑ but utilization ↓
+            if q_curr > q_prev and u_curr < u_prev:
+                self.congestion_threshold = (
+                    (1 - self.alpha) * self.congestion_threshold
+                    + self.alpha * q_curr
+                )
+
+        # -------------------------------
+        # 3. Compute future capacity (FIX)
+        # -------------------------------
+        active = current_state.active_servers
+        booting = len(current_state.booting_queue)
+
+        future_servers = active + booting
+        future_capacity = future_servers * self.capacity_per_server
+
+        # -------------------------------
+        # 4. Compute risk level
+        # -------------------------------
+        queue = current_state.queue_length
+        cpu = current_state.cpu_utilization
+
+        if queue > self.congestion_threshold:
+            risk = "high"
+        elif cpu > 0.8:
+            risk = "medium"
+        else:
+            risk = "low"
+
+        # -------------------------------
+        # 5. Publish to message bus
+        # -------------------------------
+        env.update_communication("scientist_report", {
+            "capacity_per_server": round(self.capacity_per_server, 2),
+            "future_capacity": round(future_capacity, 2),
+            "active_servers": active,
+            "booting_servers": booting,
+            "congestion_threshold": round(self.congestion_threshold, 2),
+            "risk": risk
+        })
