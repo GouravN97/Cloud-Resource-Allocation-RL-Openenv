@@ -1,11 +1,20 @@
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-pydantic>=2.5.0
-numpy>=1.24.0
-pyyaml>=6.0
-requests>=2.31.0
-openai>=1.0.0
-openenv-core>=0.2.0
-numpy==1.26.4
-scipy==1.11.4
-pandas==2.2.2
+# --- Core Infrastructure ---
+fastapi
+uvicorn
+pydantic
+pyyaml
+numpy
+
+# --- AI & Networking ---
+requests
+openai
+
+# --- Training (Teacher-Student Distillation) ---
+# Note: unsloth requires specific installation based on CUDA version.
+# These are the standard libraries for the TRL loop.
+torch
+transformers
+trl
+accelerate
+bitsandbytes
+scipy

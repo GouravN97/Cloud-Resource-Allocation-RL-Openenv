@@ -179,3 +179,9 @@ def _get_session(session_id: str) -> AutoscalerEnv:
             detail=f"Session '{session_id}' not found. Call /reset first.",
         )
     return env
+
+if __name__ == "__main__":
+    import uvicorn
+    # Start the server on localhost:8000
+    print("\n🚀 Project Nexus: Environment Server Starting...")
+    uvicorn.run(app, host="127.0.0.1", port=8000)
