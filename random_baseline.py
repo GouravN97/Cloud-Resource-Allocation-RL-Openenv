@@ -41,15 +41,17 @@ def run_random_baseline():
     # 3. Grade
     grader_res = requests.get(f"{ENV_API_URL}/grader", params={"session_id": session_id})
     result = grader_res.json()
-    score = result["score"]
     
-    print(f"  [DONE] Score: {score:.3f} | Total Reward: {total_reward:.2f}")
+    # Use 'total_reward' instead of 'score'
+    score = result.get("total_reward", 0.0)
+    
+    print(f"  [DONE] Score: {score:.3f}")
     
     return {
         "score": score,
-        "total_reward": total_reward,
-        "avg_latency": result.get("avg_latency"),
-        "sla_violations": result.get("sla_violations")
+        "sla": result.get("sla"),
+        "cost": result.get("cost"),
+        "stability": result.get("stability")
     }
 
 if __name__ == "__main__":
