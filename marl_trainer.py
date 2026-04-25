@@ -1,12 +1,14 @@
-from marl_agent import PolicyNetwork
+from marl_agent import PolicyNetwork, ValueNetwork
 from marl_utils import compute_advantages, process_state_agent1, process_state_agent2
-
+from reflexion import Reflexion
 
 class MARLTrainer:
     def __init__(self):
         self.agent1 = PolicyNetwork(input_dim=5)
         self.agent2 = PolicyNetwork(input_dim=5)
         self.best_reward = -float("inf")
+        self.value_fn = ValueNetwork(input_dim=5)
+        self.reflexion = Reflexion()
 
     def combine_actions(self, a1, a2):
         # agent2 decides whether to act
@@ -34,6 +36,12 @@ class MARLTrainer:
 
             final_action = a1 * (1 if a2 > 0 else 0)
 
+            # apply reflexion bias
+            if self.reflexion.scale_bias > 0:
+                final_action = max(final_action, 1)
+            elif self.reflexion.scale_bias < 0:
+                final_action = min(final_action, -1)
+
             result = env.step(type("A", (), {"scale_change": final_action})())
 
             next_state = result.observation
@@ -60,7 +68,7 @@ class MARLTrainer:
                 self.best_reward = total_reward
                 print(f"Episode {ep} new best: {total_reward:.3f}")
 
-            elif total_reward < self.best_reward - 0.10:
+            elif total_reward < self.best_reward - 0.15:
                 print(f"Episode {ep} skipped (bad): {total_reward:.3f}")
                 continue
 
@@ -68,10 +76,24 @@ class MARLTrainer:
 
 
             for t in range(len(states1)):
-                adv = advantages[t]
+                G = advantages[t]   # discounted return
+
+                V = self.value_fn.predict(states1[t])
+                adv = G - V
+
+                # update value function
+                self.value_fn.update(states1[t], G)
 
                 self.agent1.update(states1[t], a1s[t], adv)
                 self.agent2.update(states2[t], a2s[t], adv)
+
+            # Reflexion
+            summary = self.reflexion.summarize_episode(states1, states2, rewards)
+            prompt = self.reflexion.build_prompt(summary)
+            # use mock LLM for now
+            response = self.reflexion.mock_llm(summary)
+            self.reflexion.update_bias(response)
+            print(f"[REFLEXION] {response} | bias={self.reflexion.scale_bias:.2f}")
 
 
             print(f"Episode {ep} | Total Reward: {sum(rewards):.3f}")

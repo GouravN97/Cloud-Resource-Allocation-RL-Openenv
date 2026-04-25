@@ -63,3 +63,16 @@ class PolicyNetwork:
 
         self.W1 += self.lr * dW1
         self.b1 += self.lr * db1
+
+class ValueNetwork:
+    def __init__(self, input_dim, lr=0.001):
+        self.W = np.random.randn(input_dim)
+        self.lr = lr
+
+    def predict(self, x):
+        return np.dot(self.W, x)
+
+    def update(self, x, target):
+        pred = self.predict(x)
+        error = target - pred
+        self.W += self.lr * error * x

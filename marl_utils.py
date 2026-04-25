@@ -31,18 +31,20 @@ def process_state_agent2(state):
         trend / 50.0
     ])
 
-def compute_advantages(rewards):
-    advantages = []
-    rewards = [r * 5 for r in rewards]
-    for t in range(len(rewards)):
-        if t == 0:
-            adv = rewards[t]
-        else:
-            adv = rewards[t] - rewards[t-1]
+import numpy as np
 
-        advantages.append(adv)
+def compute_advantages(rewards, gamma=0.9):
+    returns = []
+    G = 0
 
-    advantages = np.array(advantages)
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    # compute discounted returns (backward)
+    for r in reversed(rewards):
+        G = r + gamma * G
+        returns.insert(0, G)
+
+    returns = np.array(returns)
+
+    # normalize
+    advantages = (returns - returns.mean()) / (returns.std() + 1e-8)
 
     return advantages
