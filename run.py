@@ -41,6 +41,11 @@ def run_episode(task_id, episode_num):
                 json={"session_id": session_id, "action": {"scale_change": action_val}},
                 timeout=5
             )
+            
+            if step_res.status_code != 200:
+                print(f"[ERROR] Step failed: {step_res.status_code}")
+                break
+
             step_data = step_res.json()
             next_obs = AutoscalerObservation(**step_data["observation"])
             reward = step_data.get("reward", 0.0)
