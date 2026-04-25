@@ -1,16 +1,20 @@
+# --- Core Infrastructure ---
 fastapi
 uvicorn
 pydantic
 pyyaml
 numpy
+
+# --- AI & Networking ---
 requests
 openai
-trl
-unsloth
-xformers
-bitsandbytes
-peft
-transformers
-accelerate
-datasets
+
+# --- Training (Teacher-Student Distillation) ---
+# Note: unsloth requires specific installation based on CUDA version.
+# These are the standard libraries for the TRL loop.
 torch
+transformers
+trl
+accelerate
+bitsandbytes
+scipy
