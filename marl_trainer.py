@@ -1,99 +1,76 @@
-from marl_agent import PolicyNetwork, ValueNetwork
-from marl_utils import compute_advantages, process_state_agent1, process_state_agent2
-from reflexion import Reflexion
+import os
+import torch
+from unsloth import FastLanguageModel
+from trl import DPOConfig, DPOTrainer
+from datasets import load_dataset
 
-class MARLTrainer:
-    def __init__(self):
-        self.agent1 = PolicyNetwork(input_dim=5)
-        self.agent2 = PolicyNetwork(input_dim=5)
-        self.best_reward = -float("inf")
-        self.value_fn = ValueNetwork(input_dim=5)
-        self.reflexion = Reflexion()
+# 1. SETTINGS
+MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
+DATASET_FILE = "trl_dataset.jsonl"
+OUTPUT_DIR = "nexus-student-7b"
 
-    def combine_actions(self, a1, a2):
-        # agent2 decides whether to act
-        if a2 <= 0:
-            return 0
-        return a1
+def train():
+    print(f"🚀 Starting DPO Fine-tuning: {MODEL_NAME}")
+    
+    # 2. LOAD MODEL & TOKENIZER (Optimized with Unsloth)
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name = MODEL_NAME,
+        max_seq_length = 4096,
+        load_in_4bit = True,
+    )
 
-    def run_episode(self, env, config):
-        state = env.reset(config)
+    # Add LoRA adapters
+    model = FastLanguageModel.get_peft_model(
+        model,
+        r = 16,
+        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        lora_alpha = 16,
+        lora_dropout = 0,
+        bias = "none",
+    )
 
-        states1 = []
-        states2 = []
-        actions1 = []
-        actions2 = []
-        rewards = []
+    # 3. LOAD DATASET
+    if not os.path.exists(DATASET_FILE):
+        print(f"❌ ERROR: {DATASET_FILE} not found. P2 must run reflexion.py first!")
+        return
 
-        done = False
+    dataset = load_dataset("json", data_files=DATASET_FILE, split="train")
 
-        while not done:
-            s1 = process_state_agent1(state)
-            s2 = process_state_agent2(state)
+    # 4. CONFIGURE DPO
+    training_args = DPOConfig(
+        output_dir = OUTPUT_DIR,
+        per_device_train_batch_size = 4,
+        gradient_accumulation_steps = 4,
+        learning_rate = 5e-5,
+        lr_scheduler_type = "cosine",
+        num_train_epochs = 3,
+        logging_steps = 1,
+        save_steps = 50,
+        optim = "adamw_8bit",
+        bf16 = True,
+        remove_unused_columns = False,
+    )
 
-            a1, _, idx1 = self.agent1.sample_action(s1)
-            a2, _, idx2 = self.agent2.sample_action(s2)
+    # 5. INITIALIZE TRAINER
+    dpo_trainer = DPOTrainer(
+        model = model,
+        ref_model = None, # Unsloth handles reference model automatically to save VRAM
+        args = training_args,
+        train_dataset = dataset,
+        tokenizer = tokenizer,
+        beta = 0.1, # DPO temperature
+        max_prompt_length = 1024,
+        max_length = 2048,
+    )
 
-            final_action = a1 * (1 if a2 > 0 else 0)
+    # 6. TRAIN
+    print("🔥 Training started...")
+    dpo_trainer.train()
 
-            # apply reflexion bias
-            if self.reflexion.scale_bias > 0:
-                final_action = max(final_action, 1)
-            elif self.reflexion.scale_bias < 0:
-                final_action = min(final_action, -1)
+    # 7. SAVE
+    print(f"✅ Training complete! Saving to {OUTPUT_DIR}")
+    model.save_pretrained(OUTPUT_DIR)
+    tokenizer.save_pretrained(OUTPUT_DIR)
 
-            result = env.step(type("A", (), {"scale_change": final_action})())
-
-            next_state = result.observation
-            reward = result.reward
-            done = result.done
-
-            states1.append(s1)
-            states2.append(s2)
-            actions1.append(idx1)
-            actions2.append(idx2)
-            rewards.append(reward)
-
-            state = next_state
-
-        return states1, states2, actions1, actions2, rewards
-
-    def train(self, env, config, episodes=100):
-        for ep in range(episodes):
-            states1, states2, a1s, a2s, rewards = self.run_episode(env, config)
-
-            total_reward = sum(rewards)
-            # only learn from good episodes
-            if total_reward > self.best_reward:
-                self.best_reward = total_reward
-                print(f"Episode {ep} new best: {total_reward:.3f}")
-
-            elif total_reward < self.best_reward - 0.15:
-                print(f"Episode {ep} skipped (bad): {total_reward:.3f}")
-                continue
-
-            advantages = compute_advantages(rewards)
-
-
-            for t in range(len(states1)):
-                G = advantages[t]   # discounted return
-
-                V = self.value_fn.predict(states1[t])
-                adv = G - V
-
-                # update value function
-                self.value_fn.update(states1[t], G)
-
-                self.agent1.update(states1[t], a1s[t], adv)
-                self.agent2.update(states2[t], a2s[t], adv)
-
-            # Reflexion
-            summary = self.reflexion.summarize_episode(states1, states2, rewards)
-            prompt = self.reflexion.build_prompt(summary)
-            # use mock LLM for now
-            response = self.reflexion.mock_llm(summary)
-            self.reflexion.update_bias(response)
-            print(f"[REFLEXION] {response} | bias={self.reflexion.scale_bias:.2f}")
-
-
-            print(f"Episode {ep} | Total Reward: {sum(rewards):.3f}")
+if __name__ == "__main__":
+    train()
