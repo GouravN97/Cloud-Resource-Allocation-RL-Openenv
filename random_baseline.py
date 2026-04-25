@@ -49,6 +49,7 @@ def run_random_baseline():
     
     return {
         "score": score,
+        "total_reward": score,  # Map score to total_reward for the average calculation
         "sla": result.get("sla"),
         "cost": result.get("cost"),
         "stability": result.get("stability")
