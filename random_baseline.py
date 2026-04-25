@@ -1,13 +1,12 @@
 import requests
 import random
-import time
+import json
+import os
 
 ENV_API_URL = "http://127.0.0.1:8000"
 TASK_ID = "hard"
 
 def run_random_baseline():
-    print(f"🚀 Starting RANDOM BASELINE on task: {TASK_ID}")
-    
     # 1. Reset
     res = requests.post(f"{ENV_API_URL}/reset", json={"task_id": TASK_ID})
     res.raise_for_status()
@@ -21,7 +20,6 @@ def run_random_baseline():
     # 2. Loop
     while not done:
         step += 1
-        # Pick a random action: -1 (Scale Down), 0 (Hold), 1 (Scale Up)
         action = random.choice([-1, 0, 1])
         
         step_res = requests.post(
@@ -34,20 +32,50 @@ def run_random_baseline():
         done = step_data["done"]
         total_reward += reward
         
-        q = step_data["observation"]["queue_length"]
-        s = step_data["observation"]["active_servers"]
+        obs = step_data["observation"]
+        q = obs["queue_length"]
+        s = obs["active_servers"]
         
-        print(f"  [STEP {step:02}] Action: {action:2} | Queue: {q:3} | Servers: {s:2} | Reward: {reward:.2f}")
+        # print(f"  [S{step:02}] A: {action:2} | Q: {q:3} | S: {s:2} | R: {reward:.2f}")
 
     # 3. Grade
     grader_res = requests.get(f"{ENV_API_URL}/grader", params={"session_id": session_id})
-    score = grader_res.json()["score"]
+    result = grader_res.json()
+    score = result["score"]
     
-    print("\n" + "="*30)
-    print(f"RANDOM BASELINE SCORE: {score:.3f}")
-    print(f"TOTAL REWARD: {total_reward:.2f}")
-    print("="*30)
-    print("Save this score! This is your 'Before' comparison.")
+    print(f"  [DONE] Score: {score:.3f} | Total Reward: {total_reward:.2f}")
+    
+    return {
+        "score": score,
+        "total_reward": total_reward,
+        "avg_latency": result.get("avg_latency"),
+        "sla_violations": result.get("sla_violations")
+    }
 
 if __name__ == "__main__":
-    run_random_baseline()
+    print(f"🚀 PROJECT NEXUS: Generating Stable Random Baseline (3 Runs)...")
+    
+    all_results = []
+    for i in range(1, 4):
+        print(f"  --- RUN {i}/3 ---")
+        res = run_random_baseline()
+        all_results.append(res)
+    
+    # Calculate Average
+    avg_score = sum(r["score"] for r in all_results) / 3
+    avg_reward = sum(r["total_reward"] for r in all_results) / 3
+    
+    final_output = {
+        "task_id": TASK_ID,
+        "avg_score": round(avg_score, 4),
+        "avg_reward": round(avg_reward, 2),
+        "runs": all_results
+    }
+    
+    with open("baseline_results.json", "w") as f:
+        json.dump(final_output, f, indent=2)
+        
+    print("\n" + "="*40)
+    print(f"FINAL AVERAGE BASELINE SCORE: {avg_score:.4f}")
+    print("="*40)
+    print("Results saved to baseline_results.json")
