@@ -6,33 +6,85 @@ class Scientist:
     Part of the 'World Modeling' reasoning chain.
     """
     def __init__(self):
-        self.system_prompt = textwrap.dedent("""
-            You are the 'System Scientist' for a Cloud Autoscaler.
-            Your job is to analyze metrics and detect system health issues, specifically 'Congestion Collapse'.
-            
-            PHYSICS CONTEXT:
-            - Normal Capacity: ~75-80 req/s per server.
-            - Congestion Collapse: If the queue grows too large, backend database latency increases, 
-              causing each server's effective capacity to drop quadratically.
-            
-            Analyze the relationship between Current Requests, CPU Utilization, and Queue Length.
-            If Queue is rising but CPU is dropping or stagnant, the system is CHOKING.
-            
-            Return your report in this JSON format:
-            {
-                "health_status": "Healthy" | "Congested" | "Collapsing",
-                "estimated_capacity_per_server": float,
-                "bottleneck_detected": bool,
-                "reasoning": "short explanation"
-            }
-        """).strip()
+        # Learned parameters
+        self.capacity_per_server = 100.0
+        self.congestion_threshold = 150.0
 
-    def get_prompt(self, obs):
-        return f"""
-        CURRENT METRICS:
-        - Active Servers: {obs.active_servers}
-        - Current Requests: {obs.current_requests}
-        - CPU Utilization: {obs.cpu_utilization:.2f}
-        - Queue Length: {obs.queue_length}
-        - Booting Servers (pending): {sum(obs.booting_queue)}
+        # Learning rate
+        self.alpha = 0.1
+
+    def update(self, prev_state, current_state, env):
         """
+        Update internal beliefs and publish report to message bus
+        """
+
+        # -------------------------------
+        # 0. Safety check
+        # -------------------------------
+        if current_state is None:
+            return
+
+        # -------------------------------
+        # 1. Learn capacity per server
+        # -------------------------------
+        if prev_state is not None:
+            servers = prev_state.active_servers
+
+            if servers > 0:
+                observed_capacity = prev_state.current_requests / servers
+
+                self.capacity_per_server = (
+                    (1 - self.alpha) * self.capacity_per_server
+                    + self.alpha * observed_capacity
+                )
+
+        # -------------------------------
+        # 2. Detect congestion collapse
+        # -------------------------------
+        if prev_state is not None:
+            q_prev = prev_state.queue_length
+            q_curr = current_state.queue_length
+
+            u_prev = prev_state.cpu_utilization
+            u_curr = current_state.cpu_utilization
+
+            # congestion signal: queue ↑ but utilization ↓
+            if q_curr > q_prev and u_curr < u_prev:
+                self.congestion_threshold = (
+                    (1 - self.alpha) * self.congestion_threshold
+                    + self.alpha * q_curr
+                )
+
+        # -------------------------------
+        # 3. Compute future capacity (FIX)
+        # -------------------------------
+        active = current_state.active_servers
+        booting = len(current_state.booting_queue)
+
+        future_servers = active + booting
+        future_capacity = future_servers * self.capacity_per_server
+
+        # -------------------------------
+        # 4. Compute risk level
+        # -------------------------------
+        queue = current_state.queue_length
+        cpu = current_state.cpu_utilization
+
+        if queue > self.congestion_threshold:
+            risk = "high"
+        elif cpu > 0.8:
+            risk = "medium"
+        else:
+            risk = "low"
+
+        # -------------------------------
+        # 5. Publish to message bus
+        # -------------------------------
+        env.update_communication("scientist_report", {
+            "capacity_per_server": round(self.capacity_per_server, 2),
+            "future_capacity": round(future_capacity, 2),
+            "active_servers": active,
+            "booting_servers": booting,
+            "congestion_threshold": round(self.congestion_threshold, 2),
+            "risk": risk
+        })

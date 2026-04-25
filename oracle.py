@@ -1,36 +1,63 @@
 import textwrap
 
 class Oracle:
-    """
-    Teacher Agent: Analyzes temporal demand history to forecast future spikes.
-    Part of the 'Long-Horizon Planning' reasoning chain.
-    """
     def __init__(self):
-        self.system_prompt = textwrap.dedent("""
-            You are the 'Demand Oracle' for a Cloud Autoscaler.
-            Your job is to identify workload patterns and predict demand for the next 10 steps.
-            
-            PATTERNS:
-            - Steady: Flat or low noise.
-            - Diurnal: Slow sinusoidal rise/fall.
-            - Flash Crowd: Exponential spike (High Risk).
-            - Fake Spike: Sharp rise followed by immediate drop (No action needed).
-            
-            Return your forecast in this JSON format:
-            {
-                "pattern_detected": "steady" | "diurnal" | "flash_crowd" | "noise",
-                "trend": "rising" | "falling" | "stable",
-                "predicted_peak_demand_t10": int,
-                "confidence": float,
-                "reasoning": "short explanation"
-            }
-        """).strip()
+        # how far ahead we predict (tunable later)
+        self.horizon = 5
 
-    def get_prompt(self, obs):
-        return f"""
-        DEMAND HISTORY (Last 10 steps):
-        {obs.demand_history}
-        
-        CURRENT DEMAND: {obs.current_requests}
-        PREVIOUS DEMAND: {obs.previous_requests}
+    def predict(self, state, env):
         """
+        Predict future demand using demand_history
+        and publish forecast to message bus
+        """
+
+        history = state.demand_history
+
+        # -------------------------------
+        # 1. Safety check
+        # -------------------------------
+        if len(history) < 6:
+            # not enough data → fallback
+            predicted_demand = state.current_requests
+            trend = 0
+            confidence = "low"
+        else:
+            # -------------------------------
+            # 2. Compute trend using history
+            # -------------------------------
+            first_half = history[:len(history)//2]
+            second_half = history[len(history)//2:]
+
+            avg_past = sum(first_half) / len(first_half)
+            avg_recent = sum(second_half) / len(second_half)
+
+            trend = avg_recent - avg_past
+
+            # -------------------------------
+            # 3. Predict future demand
+            # -------------------------------
+            predicted_demand = state.current_requests + trend * self.horizon
+
+            # -------------------------------
+            # 4. Detect noise vs real spike
+            # -------------------------------
+            # measure variability
+            diffs = [abs(history[i] - history[i-1]) for i in range(1, len(history))]
+            volatility = sum(diffs) / len(diffs)
+
+            if abs(trend) > volatility:
+                confidence = "high"
+            else:
+                confidence = "low"
+
+        # clamp prediction (no negative demand)
+        predicted_demand = max(0, predicted_demand)
+
+        # -------------------------------
+        # 5. Publish to message bus
+        # -------------------------------
+        env.update_communication("oracle_forecast", {
+            "predicted_demand": round(predicted_demand, 2),
+            "trend": round(trend, 2),
+            "confidence": confidence
+        })
