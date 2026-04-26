@@ -49,7 +49,8 @@ We collected trajectories of the Expert LLM (Qwen 2.5) surviving extreme "Hard" 
 * **Figure 1:** The Trained Student model drastically outperforms the baseline, proving it learned to proactively manage the queue.
 
 ### Training Convergence
-*(Placeholder for Graph 2: Training Loss vs. Steps)*
+<img width="1600" height="1000" alt="image" src="https://github.com/user-attachments/assets/ede6f559-cbde-476f-8d04-46656127fff4" />
+
 * **Figure 2:** The loss curve demonstrates stable convergence during the TRL fine-tuning phase.
 
 ⚠️ Challenges We Faced (As a Team of First-Time Builders)
