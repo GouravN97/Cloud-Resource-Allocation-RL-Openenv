@@ -1,3 +1,11 @@
+---
+title: Cloud Resource Allocation RL OpenEnv
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+---
 # Cloud Resource Allocation RL (OpenEnv)
 
 An RL-driven autoscaling system for handling **flash-crowd traffic** in cloud services where wrong scaling decisions cause queue explosions, SLA violations, and unnecessary server spend.
