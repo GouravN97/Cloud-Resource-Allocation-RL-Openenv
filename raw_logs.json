@@ -1,0 +1,22 @@
+[
+  {
+    "observation": {
+      "current_requests": 120,
+      "queue_length": 10,
+      "active_servers": 2,
+      "cpu_utilization": 1.5
+    },
+    "action": 1,
+    "reward": -0.2
+  },
+  {
+    "observation": {
+      "current_requests": 80,
+      "queue_length": 0,
+      "active_servers": 3,
+      "cpu_utilization": 0.5
+    },
+    "action": -1,
+    "reward": -0.3
+  }
+]

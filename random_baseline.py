@@ -56,7 +56,7 @@ def run_random_baseline():
     }
 
 if __name__ == "__main__":
-    print(f"🚀 PROJECT NEXUS: Generating Stable Random Baseline (3 Runs)...")
+    print(f" PROJECT NEXUS: Generating Stable Random Baseline (3 Runs)...")
     
     all_results = []
     for i in range(1, 4):

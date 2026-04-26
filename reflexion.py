@@ -28,7 +28,7 @@ class ReflexionCritic:
             self.analyze_trajectory(steps, ep_id)
 
     def analyze_trajectory(self, steps, episode_id):
-        # 🛠️ FAILURE DETECTION: Filter for LLM-reasoned steps with bad outcomes
+        # FAILURE DETECTION: Filter for LLM-reasoned steps with bad outcomes
         failures = [
             s for s in steps 
             if s.get("llm_called", False) 

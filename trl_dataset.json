@@ -1,0 +1,12 @@
+[
+  {
+    "prompt": "\nYou are a cloud autoscaling agent.\n\nCurrent state:\nRequests: 120\nQueue: 10\nServers: 2\nCPU: 1.50\n\nWhat should you do?\n(-1 = scale down, 0 = do nothing, 1 = scale up)\n",
+    "chosen": "scale up",
+    "rejected": "scale down"
+  },
+  {
+    "prompt": "\nYou are a cloud autoscaling agent.\n\nCurrent state:\nRequests: 80\nQueue: 0\nServers: 3\nCPU: 0.50\n\nWhat should you do?\n(-1 = scale down, 0 = do nothing, 1 = scale up)\n",
+    "chosen": "scale down",
+    "rejected": "scale up"
+  }
+]
