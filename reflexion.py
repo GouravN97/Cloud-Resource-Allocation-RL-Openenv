@@ -12,7 +12,7 @@ class ReflexionCritic:
         self.base_url = base_url or os.getenv("INFERENCE_URL", "http://localhost:8000")
         self.api_key = api_key or os.getenv("HF_TOKEN") or "dummy_token"
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-        self.model = os.getenv("CRITIC_MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+        self.model = os.getenv("CRITIC_MODEL_NAME", os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct"))
 
     def analyze_all_logs(self):
         """Disaster Recovery: Process all episode logs in the logs/ folder."""
