@@ -53,6 +53,9 @@ We collected trajectories of the Expert LLM (Qwen 2.5) surviving extreme "Hard" 
 
 * **Figure 2:** The loss curve demonstrates stable convergence during the TRL fine-tuning phase.
 
+  <img width="790" height="590" alt="image" src="https://github.com/user-attachments/assets/977561d2-6abd-4d05-9ed0-d264af5296e6" />
+
+
 ⚠️ Challenges We Faced (As a Team of First-Time Builders)
 
 Building Project Nexus as a team of three without deep prior experience in large-scale RL systems forced us to confront several hard, practical challenges:
