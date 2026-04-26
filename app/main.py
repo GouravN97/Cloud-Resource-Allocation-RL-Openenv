@@ -4,6 +4,7 @@ from typing import Dict
 
 import yaml
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.models import TaskConfig, AutoscalerAction
@@ -62,6 +63,11 @@ class StepRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+@app.get("/", response_class=HTMLResponse, tags=["System"])
+def home():
+    """Hugging Face Spaces index page."""
+    return "<h1>🚀 MARL Cloud Resource Allocation System is Running!</h1><p>Visit <a href='/docs'>/docs</a> to view the API documentation.</p>"
 
 @app.get("/health", tags=["System"])
 def health():
