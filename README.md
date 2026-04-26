@@ -8,6 +8,9 @@ app_port: 7860
 ---
 # Cloud Resource Allocation RL (OpenEnv)
 
+🔗 **[Hugging Face Space (Live Environment)](https://huggingface.co/spaces/gouravnayak97/MARL_cloud_resource_allocation)**
+🔗 **[Read our Hackathon Writeup (Blog.md)](./Blog.md)**
+
 An RL-driven autoscaling system for handling **flash-crowd traffic** in cloud services where wrong scaling decisions cause queue explosions, SLA violations, and unnecessary server spend.
 
 ## The Problem: Why Flash Crowds Are Hard
