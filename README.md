@@ -82,7 +82,8 @@ Create a `plots/` folder and commit both plot images (PNG/JPG) so they render in
 - **Judge signal:** Line starts higher and trends downward.
 - Optional: include Weights & Biases run link in README.
 
-Recommended file name: `plots/training_loss.png`
+<img width="1600" height="1000" alt="image" src="https://github.com/user-attachments/assets/22f15507-66c0-441c-8cf8-c8deb966fd55" />
+
 
 Figure 1 caption (example):  
 **Figure 1:** Training loss decreases over fine-tuning steps, indicating stable convergence.
@@ -100,43 +101,6 @@ Recommended file name: `plots/reward_comparison.png`
 
 Figure 2 caption (example):  
 **Figure 2:** Across evaluation episodes, the trained model consistently outperforms the random baseline in total reward.
-
-## README Plot Embeds
-
-Add these after committing plot files:
-
-Training Loss Curve
-
-*Figure 1: Training loss decreases over fine-tuning steps, indicating stable convergence.*
-
-Reward Comparison
-
-*Figure 2: Trained model achieves higher (less negative) total reward than the random baseline across episodes.*
-
-## Exact Checklist for Person 3
-
-📈 **Plot 1: The "We Actually Trained It" Graph**
-
-- What it is: Training Loss Curve.
-- X-Axis: Training Step
-- Y-Axis: Training Loss
-- What the Judges want to see: A line that starts high and goes down, proving the model actually learned the dataset.
-- Pro-Tip: If using Weights & Biases (Wandb), include the link to the run in the README.
-
-📊 **Plot 2: The "We Actually Solved the Problem" Graph (Most Important)**
-
-- What it is: A comparison plot of Total Reward.
-- X-Axis: Episode Number (e.g., 1 to 10)
-- Y-Axis: Total Reward (e.g., 0 to -100)
-- What the Judges want to see: Two lines on the SAME graph.
-  - Line 1 (Red/Dotted): The Random Baseline (hovering near -45.0 or worse).
-  - Line 2 (Green/Solid): The Trained Student Model (should be much higher, e.g., near -26.0).
-
-🏷️ **Mandatory Formatting Rules**
-
-- Labels: Both axes MUST be clearly labeled.
-- Export Format: Save plots as `.png` or `.jpg`, commit them to the repo, and show them in the README.
-- Captions: Every plot in the README needs a one-sentence caption explaining what it means.
 
 ## Repro: Baseline + Evaluation
 
