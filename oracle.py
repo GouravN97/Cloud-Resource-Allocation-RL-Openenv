@@ -4,6 +4,20 @@ class Oracle:
     def __init__(self):
         # how far ahead we predict (tunable later)
         self.horizon = 5
+        
+        self.system_prompt = textwrap.dedent("""
+            You are the 'Oracle' agent in a MARL system for Cloud Resource Management.
+            Your job is to predict future traffic patterns.
+            
+            Analyze the request history and trend:
+            - If trend is sharply positive: Predict a spike.
+            - If confidence is low: Be conservative.
+            
+            Output strictly in JSON format.
+        """)
+
+    def get_prompt(self, obs):
+        return f"History: {obs.demand_history}, Current: {obs.current_requests}"
 
     def predict(self, state, env):
         """

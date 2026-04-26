@@ -13,6 +13,20 @@ class Scientist:
         # Learning rate
         self.alpha = 0.1
 
+        self.system_prompt = textwrap.dedent("""
+            You are the 'Scientist' agent in a MARL system for Cloud Resource Management.
+            Your job is to diagnose system health and detect bottlenecks.
+            
+            Look for 'Congestion Collapse':
+            - High queue length + dropping CPU utilization = The system is thrashing.
+            - Low CPU utilization + High active servers = Under-utilization.
+            
+            Output strictly in JSON format.
+        """)
+
+    def get_prompt(self, obs):
+        return f"Current Observation: {obs.model_dump()}"
+
     def update(self, prev_state, current_state, env):
         """
         Update internal beliefs and publish report to message bus

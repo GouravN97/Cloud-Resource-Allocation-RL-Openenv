@@ -78,7 +78,7 @@ def run_episode(task_id, episode_num):
 
 if __name__ == "__main__":
     TASK = "hard"
-    EPISODES = 30
+    EPISODES = 15
     
     print(f"🚀 PROJECT NEXUS: DATA COLLECTION STARTING ({EPISODES} episodes)")
     
