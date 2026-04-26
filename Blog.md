@@ -1,6 +1,6 @@
-# Project Nexus: Taming Cloud Flash Crowds with Multi-Agent RL
+# Project Nexus: Taming Cloud Flash Crowds with Multi-Agent Reinforcement Learning
 
-## 🌪️ The Problem: The "Flash Crowd" Capability Gap
+## 🌪️ The Problem we address: The "Flash Crowd" scenario that traditional cloud servers cannot handle...
 Scaling cloud infrastructure isn't as simple as "if CPU > 80%, add a server." In the real world, cloud systems face **Flash Crowds**—sudden, massive spikes in traffic (e.g., a viral moment or a Black Friday sale). 
 
 When a flash crowd hits, two deadly things happen:
